@@ -1,4 +1,4 @@
-{ lib, pkgs, sloth, ... }:
+{ config, lib, pkgs, sloth, ... }:
 with lib;
 let
   mkMountToggle = desc: mkOption {
@@ -47,6 +47,12 @@ in {
       default = [];
     };
 
+    sockets = {
+      wayland = mkMountToggle "the active Wayland socket" // { default = false; };
+      pipewire = mkMountToggle "the first PipeWire socket" // { default = false; };
+      x11 = mkMountToggle "all X11 sockets" // { default = false; };
+    };
+
     package = mkOption {
       description = "Bubblewrap package to use.";
       type = types.package;
@@ -63,5 +69,17 @@ in {
       type = with types; attrsOf (nullOr str);
       default = {};
     };
+  };
+
+  config = {
+    bubblewrap.bind.ro = let
+      cfg = config.bubblewrap.sockets;
+    in
+      (optional cfg.wayland (sloth.concat [sloth.runtimeDir "/" (sloth.envOr "WAYLAND_DISPLAY" "wayland-0")]))
+      ++ (optional cfg.pipewire (sloth.concat' sloth.runtimeDir "/pipewire-0"))
+      ++ (optionals cfg.x11 [
+        (sloth.env "XAUTHORITY")
+        "/tmp/.X11-unix"
+      ]);
   };
 }
